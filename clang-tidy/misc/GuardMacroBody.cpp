@@ -37,7 +37,7 @@ public:
                     const MacroDirective *MD) override;
 
 private:
-  bool isGuardNeeded(const MacroInfo *) const;
+  bool isSimpleOrGuarded(const MacroInfo *Info) const;
 
   GuardMacroBody &Check_;
   SourceManager &SM_;
@@ -46,20 +46,113 @@ private:
 void GuardMacroBodyCallbacks::MacroDefined(const Token &MacroNameTok,
                                            const MacroDirective *MD) {
   const auto MacroNameLoc = MacroNameTok.getLocation();
-  if (SM_.isInMainFile(MacroNameLoc)) {
-    if (isGuardNeeded(MD->getMacroInfo())) {
-      Check_.diag(MacroNameLoc, "unguarded macro body");
-    }
+  if (SM_.getMainFileID() != SM_.getDecomposedLoc(MacroNameLoc).first) {
+    return;
   }
+
+  const auto Info = MD->getMacroInfo();
+  if (Info->isUsedForHeaderGuard() || isSimpleOrGuarded(Info)) {
+    return;
+  }
+
+  Check_.diag(MacroNameLoc, "macro guard needed");
 }
 
-bool GuardMacroBodyCallbacks::isGuardNeeded(const MacroInfo *Info) const {
-  for (auto Token : Info) {
-    if (Token.getKind() == tok::kw_if) {
-      return true;
+bool GuardMacroBodyCallbacks::isSimpleOrGuarded(const MacroInfo *Info) const {
+  enum TokenState {
+    NothingYet,
+    SeenDo,
+    SeenOpenBrace,
+    SeenSimpleStatement,
+    SeenCloseBrace,
+    SeenWhile,
+    SeenOpenParen,
+    SeenFalse,
+    SeenCloseParen,
+    Looking
+  };
+  auto State = TokenState::NothingYet;
+  bool SimpleStatementBody = false;
+  for (auto T : Info) {
+    const auto Kind = T.getKind();
+    switch (State) {
+    case NothingYet:
+      if (Kind == tok::kw_do) {
+        State = SeenDo;
+      } else if (Kind == tok::kw_if) {
+        return false;
+      } else {
+        State = Looking;
+      }
+      break;
+
+    case SeenDo:
+      if (Kind == tok::l_brace) {
+        State = SeenOpenBrace;
+      } else {
+        State = SeenSimpleStatement;
+      }
+      break;
+
+    case SeenSimpleStatement:
+      SimpleStatementBody = true;
+      if (Kind == tok::kw_while) {
+        State = SeenWhile;
+      }
+      break;
+
+    case SeenOpenBrace:
+      if (Kind == tok::r_brace) {
+        State = SeenCloseBrace;
+      }
+      break;
+
+    case SeenCloseBrace:
+      if (Kind == tok::kw_while) {
+        State = SeenWhile;
+      } else {
+        State = SimpleStatementBody ? SeenSimpleStatement : SeenOpenBrace;
+      }
+      break;
+
+    case SeenWhile:
+      if (Kind == tok::l_paren) {
+        State = SeenOpenParen;
+      } else {
+        State = SimpleStatementBody ? SeenSimpleStatement : SeenOpenBrace;
+      }
+      break;
+
+    case SeenOpenParen:
+      if (Kind == tok::kw_false) {
+        State = SeenFalse;
+      } else {
+        State = SimpleStatementBody ? SeenSimpleStatement : SeenOpenBrace;
+      }
+      break;
+
+    case SeenFalse:
+      if (Kind == tok::r_paren) {
+        State = SeenCloseParen;
+      } else {
+        State = SimpleStatementBody ? SeenSimpleStatement : SeenOpenBrace;
+      }
+      break;
+
+    case SeenCloseParen:
+      if (Kind != tok::semi) {
+        State = SimpleStatementBody ? SeenSimpleStatement : SeenOpenBrace;
+      }
+      break;
+
+    case Looking:
+      if (Kind == tok::kw_if) {
+        return false;
+      }
+      break;
     }
   }
-  return false;
+  return State == SeenCloseParen || State == Looking;
 }
 
 } // namespace
