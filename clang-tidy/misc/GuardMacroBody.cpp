@@ -160,7 +160,13 @@ void GuardMacroBodyCallbacks::MacroDefined(const Token &MacroNameTok,
     return;
   }
 
-  Check_.diag(MacroNameLoc, "macro guard needed");
+  const auto Start = Info->getReplacementToken(0).getLocation();
+  const auto LastToken = Info->getReplacementToken(Info->getNumTokens() - 1);
+  const auto End =
+      LastToken.getLocation().getLocWithOffset(LastToken.getLength());
+  Check_.diag(MacroNameLoc, "macro guard needed")
+      << FixItHint::CreateInsertion(Start, "do { ")
+      << FixItHint::CreateInsertion(End, "; } while (false)");
 }
 
 } // namespace

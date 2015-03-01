@@ -7,6 +7,7 @@
 
 #define UNGUARDED_IF(x_) if (x_ > 0) return true
 // CHECK-MESSAGES: :[[@LINE-1]]:9: warning: macro guard needed [misc-guard-macro-body]
+// CHECK-FIXES: {{^}}#define UNGUARDED_IF(x_) do { if (x_ > 0) return true; } while (false)
 
 #define GUARDED_IF(x_)                                                         \
   do {                                                                         \
