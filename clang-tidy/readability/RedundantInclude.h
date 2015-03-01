@@ -17,6 +17,10 @@ namespace clang {
 namespace tidy {
 namespace readability {
 
+/// \brief Find and remove redundant #include directives.
+///
+/// Any change in the defined macros in the main file between \c #include
+/// directives resets the list of includes used to check for duplicates.
 class RedundantInclude : public ClangTidyCheck {
 public:
   RedundantInclude(StringRef Name, ClangTidyContext *Context)
