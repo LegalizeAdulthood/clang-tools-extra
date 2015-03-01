@@ -14,6 +14,7 @@
 #include "ContainerSizeEmptyCheck.h"
 #include "ElseAfterReturnCheck.h"
 #include "FunctionSizeCheck.h"
+#include "RedundantInclude.h"
 #include "RedundantSmartptrGetCheck.h"
 #include "ShrinkToFitCheck.h"
 
@@ -32,10 +33,11 @@ public:
         "readability-else-after-return");
     CheckFactories.registerCheck<FunctionSizeCheck>(
         "readability-function-size");
+    CheckFactories.registerCheck<RedundantInclude>(
+        "readability-redundant-include");
     CheckFactories.registerCheck<RedundantSmartptrGetCheck>(
         "readability-redundant-smartptr-get");
-    CheckFactories.registerCheck<ShrinkToFitCheck>(
-        "readability-shrink-to-fit");
+    CheckFactories.registerCheck<ShrinkToFitCheck>("readability-shrink-to-fit");
   }
 };
 
@@ -43,7 +45,7 @@ public:
 
 // Register the MiscTidyModule using this statically initialized variable.
 static ClangTidyModuleRegistry::Add<readability::ReadabilityModule>
-X("readability-module", "Adds readability-related checks.");
+    X("readability-module", "Adds readability-related checks.");
 
 // This anchor is used to force the linker to link in the generated object file
 // and thus register the MiscModule.
