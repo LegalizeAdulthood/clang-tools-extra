@@ -12,15 +12,16 @@
 #include "clang/Lex/MacroInfo.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Lex/Token.h"
+#include <utility>
 
 namespace clang {
 
-MacroInfo::tokens_iterator begin(const MacroInfo *Info) {
-  return Info->tokens_begin();
+MacroInfo::tokens_iterator begin(const MacroInfo &Info) {
+  return Info.tokens_begin();
 }
 
-MacroInfo::tokens_iterator end(const MacroInfo *Info) {
-  return Info->tokens_end();
+MacroInfo::tokens_iterator end(const MacroInfo &Info) {
+  return Info.tokens_end();
 }
 
 namespace tidy {
@@ -47,11 +48,11 @@ private:
 /// The minimum number of tokens present in a macro that has a complete if
 /// statement is 4: if, (, expr, ).  Therefore any macro with fewer tokens
 /// cannot contain an if statement that must be guarded.
-bool isSimpleMacro(const MacroInfo *Info) { return Info->getNumTokens() < 4; }
+bool isSimpleMacro(const MacroInfo &Info) { return Info.getNumTokens() < 4; }
 
 /// \brief Returns true for macros containing a do/while (false) guard block.
 ///
-bool isGuarded(const MacroInfo *Info) {
+bool isGuarded(const MacroInfo &Info) {
   enum TokenState {
     NothingYet,
     SeenDo,
@@ -148,6 +149,23 @@ bool isGuarded(const MacroInfo *Info) {
   return State == SeenCloseParen || State == Looking;
 }
 
+bool isLastTokenSemiColon(const MacroInfo &Info) {
+  return Info.getReplacementToken(Info.getNumTokens()-1).getKind() == tok::semi;
+}
+
+SourceLocation tokenEndLoc(const Token &T) {
+  return T.getLocation().getLocWithOffset(T.getLength());
+}
+
+std::pair<SourceLocation, SourceLocation>
+getInsertionLocations(const MacroInfo &Info) {
+  const auto Start = Info.getReplacementToken(0).getLocation();
+  const auto EndTokenIndex =
+      Info.getNumTokens() - (isLastTokenSemiColon(Info) ? 2 : 1);
+  auto EndToken = Info.getReplacementToken(EndTokenIndex);
+  return std::make_pair(Start, tokenEndLoc(EndToken));
+}
+
 void GuardMacroBodyCallbacks::MacroDefined(const Token &MacroNameTok,
                                            const MacroDirective *MD) {
   const auto MacroNameLoc = MacroNameTok.getLocation();
@@ -155,18 +173,15 @@ void GuardMacroBodyCallbacks::MacroDefined(const Token &MacroNameTok,
     return;
   }
 
-  const auto Info = MD->getMacroInfo();
-  if (Info->isUsedForHeaderGuard() || isSimpleMacro(Info) || isGuarded(Info)) {
+  const auto &Info = *MD->getMacroInfo();
+  if (Info.isUsedForHeaderGuard() || isSimpleMacro(Info) || isGuarded(Info)) {
     return;
   }
 
-  const auto Start = Info->getReplacementToken(0).getLocation();
-  const auto LastToken = Info->getReplacementToken(Info->getNumTokens() - 1);
-  const auto End =
-      LastToken.getLocation().getLocWithOffset(LastToken.getLength());
+  const auto InsertionLocs = getInsertionLocations(Info);
   Check_.diag(MacroNameLoc, "macro guard needed")
-      << FixItHint::CreateInsertion(Start, "do { ")
-      << FixItHint::CreateInsertion(End, "; } while (false)");
+      << FixItHint::CreateInsertion(InsertionLocs.first, "do { ")
+      << FixItHint::CreateInsertion(InsertionLocs.second, "; } while (false)");
 }
 
 } // namespace
