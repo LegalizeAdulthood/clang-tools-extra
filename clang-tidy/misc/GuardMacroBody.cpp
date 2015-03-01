@@ -37,8 +37,6 @@ public:
                     const MacroDirective *MD) override;
 
 private:
-  bool isGuarded(const MacroInfo *Info) const;
-
   GuardMacroBody &Check_;
   SourceManager &SM_;
 };
@@ -51,24 +49,9 @@ private:
 /// cannot contain an if statement that must be guarded.
 bool isSimpleMacro(const MacroInfo *Info) { return Info->getNumTokens() < 4; }
 
-void GuardMacroBodyCallbacks::MacroDefined(const Token &MacroNameTok,
-                                           const MacroDirective *MD) {
-  const auto MacroNameLoc = MacroNameTok.getLocation();
-  if (SM_.getMainFileID() != SM_.getDecomposedLoc(MacroNameLoc).first) {
-    return;
-  }
-
-  const auto Info = MD->getMacroInfo();
-  if (Info->isUsedForHeaderGuard() || isSimpleMacro(Info) || isGuarded(Info)) {
-    return;
-  }
-
-  Check_.diag(MacroNameLoc, "macro guard needed");
-}
-
 /// \brief Returns true for macros containing a do/while (false) guard block.
 ///
-bool GuardMacroBodyCallbacks::isGuarded(const MacroInfo *Info) const {
+bool isGuarded(const MacroInfo *Info) {
   enum TokenState {
     NothingYet,
     SeenDo,
@@ -163,6 +146,21 @@ bool GuardMacroBodyCallbacks::isGuarded(const MacroInfo *Info) const {
     }
   }
   return State == SeenCloseParen || State == Looking;
+}
+
+void GuardMacroBodyCallbacks::MacroDefined(const Token &MacroNameTok,
+                                           const MacroDirective *MD) {
+  const auto MacroNameLoc = MacroNameTok.getLocation();
+  if (SM_.getMainFileID() != SM_.getDecomposedLoc(MacroNameLoc).first) {
+    return;
+  }
+
+  const auto Info = MD->getMacroInfo();
+  if (Info->isUsedForHeaderGuard() || isSimpleMacro(Info) || isGuarded(Info)) {
+    return;
+  }
+
+  Check_.diag(MacroNameLoc, "macro guard needed");
 }
 
 } // namespace
