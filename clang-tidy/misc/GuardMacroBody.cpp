@@ -37,11 +37,19 @@ public:
                     const MacroDirective *MD) override;
 
 private:
-  bool isSimpleOrGuarded(const MacroInfo *Info) const;
+  bool isGuarded(const MacroInfo *Info) const;
 
   GuardMacroBody &Check_;
   SourceManager &SM_;
 };
+
+/// \brief Returns true if the given macro is too simple to contain an if
+/// statement.
+///
+/// The minimum number of tokens present in a macro that has a complete if
+/// statement is 4: if, (, expr, ).  Therefore any macro with fewer tokens
+/// cannot contain an if statement that must be guarded.
+bool isSimpleMacro(const MacroInfo *Info) { return Info->getNumTokens() < 4; }
 
 void GuardMacroBodyCallbacks::MacroDefined(const Token &MacroNameTok,
                                            const MacroDirective *MD) {
@@ -51,14 +59,16 @@ void GuardMacroBodyCallbacks::MacroDefined(const Token &MacroNameTok,
   }
 
   const auto Info = MD->getMacroInfo();
-  if (Info->isUsedForHeaderGuard() || isSimpleOrGuarded(Info)) {
+  if (Info->isUsedForHeaderGuard() || isSimpleMacro(Info) || isGuarded(Info)) {
     return;
   }
 
   Check_.diag(MacroNameLoc, "macro guard needed");
 }
 
-bool GuardMacroBodyCallbacks::isSimpleOrGuarded(const MacroInfo *Info) const {
+/// \brief Returns true for macros containing a do/while (false) guard block.
+///
+bool GuardMacroBodyCallbacks::isGuarded(const MacroInfo *Info) const {
   enum TokenState {
     NothingYet,
     SeenDo,
