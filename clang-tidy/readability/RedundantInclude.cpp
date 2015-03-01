@@ -13,7 +13,6 @@
 #include "clang/Lex/Preprocessor.h"
 #include <algorithm>
 #include <vector>
-#include <sstream>
 
 namespace clang {
 namespace tidy {
@@ -44,6 +43,12 @@ public:
                           StringRef SearchPath, StringRef RelativePath,
                           const Module *Imported) override;
 
+  void MacroDefined(const Token &MacroNameTok,
+                    const MacroDirective *MD) override;
+
+  void MacroUndefined(const Token &MacroNameTok,
+                      const MacroDirective *MD) override;
+
 private:
   std::vector<StringRef> Files_;
   RedundantInclude &Check_;
@@ -66,6 +71,20 @@ void RedundantIncludeCallbacks::InclusionDirective(
         << FixItHint::CreateRemoval(SourceRange(Start, End));
   } else {
     Files_.push_back(FileName);
+  }
+}
+
+void RedundantIncludeCallbacks::MacroDefined(const Token &MacroNameTok,
+                                             const MacroDirective *MD) {
+  if (SM_.isInMainFile(MacroNameTok.getLocation())) {
+    Files_.clear();
+  }
+}
+
+void RedundantIncludeCallbacks::MacroUndefined(const Token &MacroNameTok,
+                                               const MacroDirective *MD) {
+  if (SM_.isInMainFile(MacroNameTok.getLocation())) {
+    Files_.clear();
   }
 }
 

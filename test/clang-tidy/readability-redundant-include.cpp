@@ -53,3 +53,21 @@ int n;
 // CHECK-MESSAGES: :[[@LINE-2]]:9: warning: {{.*}}
 // CHECK-FIXES:      {{^int m;$}}
 // CHECK-FIXES-NEXT: {{^int n;$}}
+
+// defining a macro in the main file resets the included file cache
+#define ARBITRARY_MACRO
+int o;
+#include <sys/types.h>
+int p;
+// CHECK-FIXES:      {{^int o;$}}
+// CHECK-FIXES-NEXT: {{^#include <sys/types.h>$}}
+// CHECK-FIXES-NEXT: {{^int p;$}}
+
+// undefining a macro resets the cache
+#undef ARBITRARY_MACRO
+int q;
+#include <sys/types.h>
+int r;
+// CHECK-FIXES:      {{^int q;$}}
+// CHECK-FIXES-NEXT: {{^#include <sys/types.h>$}}
+// CHECK-FIXES-NEXT: {{^int r;$}}
