@@ -19,6 +19,7 @@
 #include "InconsistentDeclarationParameterNameCheck.h"
 #include "NamedParameterCheck.h"
 #include "RedundantControlFlowCheck.h"
+#include "RedundantFwdDecl.h"
 #include "RedundantSmartptrGetCheck.h"
 #include "RedundantStringCStrCheck.h"
 #include "SimplifyBooleanExprCheck.h"
@@ -49,6 +50,8 @@ public:
         "readability-named-parameter");
     CheckFactories.registerCheck<RedundantControlFlowCheck>(
         "readability-redundant-control-flow");
+    CheckFactories.registerCheck<RedundantFwdDecl>(
+         "readability-redundant-fwd-decl");
     CheckFactories.registerCheck<RedundantSmartptrGetCheck>(
         "readability-redundant-smartptr-get");
     CheckFactories.registerCheck<RedundantStringCStrCheck>(
