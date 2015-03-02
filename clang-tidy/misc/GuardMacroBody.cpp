@@ -12,6 +12,7 @@
 #include "clang/Lex/MacroInfo.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Lex/Token.h"
+#include <algorithm>
 #include <utility>
 
 namespace clang {
@@ -50,107 +51,44 @@ private:
 /// cannot contain an if statement that must be guarded.
 bool isSimpleMacro(const MacroInfo &Info) { return Info.getNumTokens() < 4; }
 
-/// \brief Returns true for macros containing a do/while (false) guard block.
-///
-bool isGuarded(const MacroInfo &Info) {
-  enum TokenState {
-    NothingYet,
-    SeenDo,
-    SeenOpenBrace,
-    SeenSimpleStatement,
-    SeenCloseBrace,
-    SeenWhile,
-    SeenOpenParen,
-    SeenFalse,
-    SeenCloseParen,
-    Looking
-  };
-  auto State = TokenState::NothingYet;
-  bool SimpleStatementBody = false;
-  for (auto T : Info) {
-    const auto Kind = T.getKind();
-    switch (State) {
-    case NothingYet:
-      if (Kind == tok::kw_do) {
-        State = SeenDo;
-      } else if (Kind == tok::kw_if) {
-        return false;
-      } else {
-        State = Looking;
-      }
-      break;
-
-    case SeenDo:
-      if (Kind == tok::l_brace) {
-        State = SeenOpenBrace;
-      } else {
-        State = SeenSimpleStatement;
-      }
-      break;
-
-    case SeenSimpleStatement:
-      SimpleStatementBody = true;
-      if (Kind == tok::kw_while) {
-        State = SeenWhile;
-      }
-      break;
-
-    case SeenOpenBrace:
-      if (Kind == tok::r_brace) {
-        State = SeenCloseBrace;
-      }
-      break;
-
-    case SeenCloseBrace:
-      if (Kind == tok::kw_while) {
-        State = SeenWhile;
-      } else {
-        State = SimpleStatementBody ? SeenSimpleStatement : SeenOpenBrace;
-      }
-      break;
-
-    case SeenWhile:
-      if (Kind == tok::l_paren) {
-        State = SeenOpenParen;
-      } else {
-        State = SimpleStatementBody ? SeenSimpleStatement : SeenOpenBrace;
-      }
-      break;
-
-    case SeenOpenParen:
-      if (Kind == tok::kw_false) {
-        State = SeenFalse;
-      } else {
-        State = SimpleStatementBody ? SeenSimpleStatement : SeenOpenBrace;
-      }
-      break;
-
-    case SeenFalse:
-      if (Kind == tok::r_paren) {
-        State = SeenCloseParen;
-      } else {
-        State = SimpleStatementBody ? SeenSimpleStatement : SeenOpenBrace;
-      }
-      break;
-
-    case SeenCloseParen:
-      if (Kind != tok::semi) {
-        State = SimpleStatementBody ? SeenSimpleStatement : SeenOpenBrace;
-      }
-      break;
-
-    case Looking:
-      if (Kind == tok::kw_if) {
-        return false;
-      }
-      break;
-    }
-  }
-  return State == SeenCloseParen || State == Looking;
+tok::TokenKind getTokenKind(const MacroInfo &Info, unsigned Tok) {
+  return Info.getReplacementToken(Tok).getKind();
 }
 
 bool isLastTokenSemiColon(const MacroInfo &Info) {
-  return Info.getReplacementToken(Info.getNumTokens()-1).getKind() == tok::semi;
+  return Info.getReplacementToken(Info.getNumTokens() - 1).getKind() ==
+         tok::semi;
+}
+
+bool hasMultipleStatements(const MacroInfo &Info) {
+  return std::count_if(
+             Info.tokens_begin(), Info.tokens_end(),
+             [](Token const &T) { return T.getKind() == tok::semi; }) > 1;
+}
+
+/// \brief Returns true for macros containing a do/while (false) guard block,
+/// those enclosed in double braces, or those simple enough not to consider
+/// needing a guard.
+///
+bool isGuarded(const MacroInfo &Info) {
+  const auto LastIndex =
+      Info.getNumTokens() - (isLastTokenSemiColon(Info) ? 2 : 1);
+  if (getTokenKind(Info, 0) == tok::kw_do &&
+      getTokenKind(Info, LastIndex - 3) == tok::kw_while &&
+      getTokenKind(Info, LastIndex - 2) == tok::l_paren &&
+      getTokenKind(Info, LastIndex - 1) == tok::kw_false &&
+      getTokenKind(Info, LastIndex - 0) == tok::r_paren) {
+    return true;
+  } else if (getTokenKind(Info, 0) == tok::l_brace &&
+             getTokenKind(Info, LastIndex) == tok::r_brace) {
+    return true;
+  } else if (getTokenKind(Info, 0) == tok::kw_if ||
+             hasMultipleStatements(Info)) {
+    return false;
+  }
+
+  // anything else we assume doesn't need a guard
+  return true;
 }
 
 SourceLocation tokenEndLoc(const Token &T) {
