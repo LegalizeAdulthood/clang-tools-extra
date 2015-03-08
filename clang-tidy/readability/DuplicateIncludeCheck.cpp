@@ -1,4 +1,4 @@
-//===--- RedundantInclude.cpp - clang-tidy-----------------------*- C++ -*-===//
+//===--- DuplicateIncludeCheck.cpp - clang-tidy------------------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,7 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "RedundantInclude.h"
+#include "DuplicateIncludeCheck.h"
 #include "../ClangTidy.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Lex/Preprocessor.h"
@@ -22,8 +22,8 @@ namespace {
 
 SourceLocation AdvanceBeyondCurrentLine(SourceManager &SM, SourceLocation Start,
                                         int Offset) {
-  const auto Id = SM.getFileID(Start);
-  const auto LineNumber = SM.getSpellingLineNumber(Start);
+  const FileID Id = SM.getFileID(Start);
+  const unsigned LineNumber = SM.getSpellingLineNumber(Start);
   while (SM.getFileID(Start) == Id &&
          SM.getSpellingLineNumber(Start.getLocWithOffset(Offset)) ==
              LineNumber) {
@@ -32,9 +32,9 @@ SourceLocation AdvanceBeyondCurrentLine(SourceManager &SM, SourceLocation Start,
   return Start;
 }
 
-class RedundantIncludeCallbacks : public PPCallbacks {
+class DuplicateIncludeCallbacks : public PPCallbacks {
 public:
-  RedundantIncludeCallbacks(RedundantInclude &Check, SourceManager &SM)
+  DuplicateIncludeCallbacks(DuplicateIncludeCheck &Check, SourceManager &SM)
       : Check_(Check), SM_(SM) {}
 
   void InclusionDirective(SourceLocation HashLoc, const Token &IncludeTok,
@@ -51,11 +51,11 @@ public:
 
 private:
   std::vector<StringRef> Files_;
-  RedundantInclude &Check_;
+  DuplicateIncludeCheck &Check_;
   SourceManager &SM_;
 };
 
-void RedundantIncludeCallbacks::InclusionDirective(
+void DuplicateIncludeCallbacks::InclusionDirective(
     SourceLocation HashLoc, const Token &IncludeTok, StringRef FileName,
     bool IsAngled, CharSourceRange FilenameRange, const FileEntry *File,
     StringRef SearchPath, StringRef RelativePath, const Module *Imported) {
@@ -67,21 +67,21 @@ void RedundantIncludeCallbacks::InclusionDirective(
     const auto Start =
         AdvanceBeyondCurrentLine(SM_, HashLoc, -1).getLocWithOffset(-1);
     const auto End = AdvanceBeyondCurrentLine(SM_, FilenameRange.getEnd(), 1);
-    Check_.diag(HashLoc, "redundant include")
+    Check_.diag(HashLoc, "duplicate include")
         << FixItHint::CreateRemoval(SourceRange(Start, End));
   } else {
     Files_.push_back(FileName);
   }
 }
 
-void RedundantIncludeCallbacks::MacroDefined(const Token &MacroNameTok,
+void DuplicateIncludeCallbacks::MacroDefined(const Token &MacroNameTok,
                                              const MacroDirective *MD) {
   if (SM_.isInMainFile(MacroNameTok.getLocation())) {
     Files_.clear();
   }
 }
 
-void RedundantIncludeCallbacks::MacroUndefined(const Token &MacroNameTok,
+void DuplicateIncludeCallbacks::MacroUndefined(const Token &MacroNameTok,
                                                const MacroDirective *MD) {
   if (SM_.isInMainFile(MacroNameTok.getLocation())) {
     Files_.clear();
@@ -90,9 +90,9 @@ void RedundantIncludeCallbacks::MacroUndefined(const Token &MacroNameTok,
 
 } // namespace
 
-void RedundantInclude::registerPPCallbacks(CompilerInstance &Compiler) {
+void DuplicateIncludeCheck::registerPPCallbacks(CompilerInstance &Compiler) {
   Compiler.getPreprocessor().addPPCallbacks(
-      llvm::make_unique<RedundantIncludeCallbacks>(
+      llvm::make_unique<DuplicateIncludeCallbacks>(
           *this, Compiler.getSourceManager()));
 }
 

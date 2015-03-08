@@ -12,6 +12,7 @@
 #include "../ClangTidyModuleRegistry.h"
 #include "BracesAroundStatementsCheck.h"
 #include "ContainerSizeEmptyCheck.h"
+#include "DuplicateIncludeCheck.h"
 #include "ElseAfterReturnCheck.h"
 #include "FunctionSizeCheck.h"
 #include "RedundantInclude.h"
@@ -29,12 +30,12 @@ public:
         "readability-braces-around-statements");
     CheckFactories.registerCheck<ContainerSizeEmptyCheck>(
         "readability-container-size-empty");
+    CheckFactories.registerCheck<DuplicateIncludeCheck>(
+        "readability-duplicate-include");
     CheckFactories.registerCheck<ElseAfterReturnCheck>(
         "readability-else-after-return");
     CheckFactories.registerCheck<FunctionSizeCheck>(
         "readability-function-size");
-    CheckFactories.registerCheck<RedundantInclude>(
-        "readability-redundant-include");
     CheckFactories.registerCheck<RedundantSmartptrGetCheck>(
         "readability-redundant-smartptr-get");
     CheckFactories.registerCheck<ShrinkToFitCheck>("readability-shrink-to-fit");

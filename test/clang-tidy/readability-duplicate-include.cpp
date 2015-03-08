@@ -1,4 +1,4 @@
-// RUN: $(dirname %s)/check_clang_tidy.sh %s readability-redundant-include %t -- -std=c++11 -I$(dirname %s)
+// RUN: $(dirname %s)/check_clang_tidy.sh %s readability-duplicate-include %t -- -std=c++11 -I$(dirname %s)
 // REQUIRES: shell
 
 int a;
@@ -6,7 +6,7 @@ int a;
 int b;
 #include <string.h>
 int c;
-// CHECK-MESSAGES: :[[@LINE-2]]:1: warning: redundant include [readability-redundant-include]
+// CHECK-MESSAGES: :[[@LINE-2]]:1: warning: duplicate include [readability-duplicate-include]
 // CHECK-FIXES:      {{^int a;$}}
 // CHECK-FIXES-NEXT: {{^#include <string.h>$}}
 // CHECK-FIXES-NEXT: {{^int b;$}}
@@ -24,13 +24,13 @@ int f;
 // CHECK-FIXES-NEXT: {{^int f;$}}
 
 int g;
-#include "readability-redundant-include.h"
+#include "readability-duplicate-include.h"
 int h;
-#include "readability-redundant-include.h"
+#include "readability-duplicate-include.h"
 int i;
 // CHECK-MESSAGES: :[[@LINE-2]]:1: warning: {{.*}}
 // CHECK-FIXES:      {{^int g;$}}
-// CHECK-FIXES-NEXT: {{^#include "readability-redundant-include.h"$}}
+// CHECK-FIXES-NEXT: {{^#include "readability-duplicate-include.h"$}}
 // CHECK-FIXES-NEXT: {{^int h;$}}
 // CHECK-FIXES-NEXT: {{^int i;$}}
 

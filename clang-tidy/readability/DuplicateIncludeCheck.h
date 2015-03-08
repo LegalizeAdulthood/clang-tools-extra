@@ -1,4 +1,4 @@
-//===--- RedundantInclude.h - clang-tidy-------------------------*- C++ -*-===//
+//===--- DuplicateIncludeCheck.h - clang-tidy--------------------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,8 +7,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_READABILITY_REDUNDANT_INCLUDE_H
-#define LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_READABILITY_REDUNDANT_INCLUDE_H
+#ifndef LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_READABILITY_DUPLICATE_INCLUDE_CHECK_H
+#define LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_READABILITY_DUPLICATE_INCLUDE_CHECK_H
 
 #include <clang/Frontend/CompilerInstance.h>
 #include "../ClangTidy.h"
@@ -21,9 +21,9 @@ namespace readability {
 ///
 /// Any change in the defined macros in the main file between \c #include
 /// directives resets the list of includes used to check for duplicates.
-class RedundantInclude : public ClangTidyCheck {
+class DuplicateIncludeCheck : public ClangTidyCheck {
 public:
-  RedundantInclude(StringRef Name, ClangTidyContext *Context)
+  DuplicateIncludeCheck(StringRef Name, ClangTidyContext *Context)
       : ClangTidyCheck(Name, Context) {}
 
   void registerPPCallbacks(CompilerInstance &Compiler) override;
@@ -33,4 +33,4 @@ public:
 } // namespace tidy
 } // namespace clang
 
-#endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_READABILITY_REDUNDANT_INCLUDE_H
+#endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_READABILITY_DUPLICATE_INCLUDE_CHECK_H
