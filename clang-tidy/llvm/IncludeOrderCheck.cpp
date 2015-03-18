@@ -10,6 +10,7 @@
 #include "IncludeOrderCheck.h"
 #include "../utils/IncludeBlockPPCallbacks.h"
 #include "clang/AST/ASTConsumer.h"
+#include "clang/Frontend/CompilerInstance.h"
 #include "clang/Lex/Preprocessor.h"
 
 namespace clang {
