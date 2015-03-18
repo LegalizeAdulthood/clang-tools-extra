@@ -8,8 +8,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "IncludeOrderCheck.h"
-#include "clang/Frontend/CompilerInstance.h"
-#include "clang/Lex/PPCallbacks.h"
+#include "../utils/IncludeBlockPPCallbacks.h"
+#include "clang/AST/ASTConsumer.h"
 #include "clang/Lex/Preprocessor.h"
 
 namespace clang {
@@ -17,31 +17,13 @@ namespace tidy {
 namespace llvm {
 
 namespace {
-class IncludeOrderPPCallbacks : public PPCallbacks {
+class IncludeOrderPPCallbacks : public IncludeBlockPPCallbacks {
 public:
   explicit IncludeOrderPPCallbacks(ClangTidyCheck &Check, SourceManager &SM)
-      : LookForMainModule(true), Check(Check), SM(SM) {}
+      : IncludeBlockPPCallbacks(Check, SM) {}
 
-  void InclusionDirective(SourceLocation HashLoc, const Token &IncludeTok,
-                          StringRef FileName, bool IsAngled,
-                          CharSourceRange FilenameRange, const FileEntry *File,
-                          StringRef SearchPath, StringRef RelativePath,
-                          const Module *Imported) override;
-  void EndOfMainFile() override;
-
-private:
-  struct IncludeDirective {
-    SourceLocation Loc;    ///< '#' location in the include directive
-    CharSourceRange Range; ///< SourceRange for the file name
-    StringRef Filename;    ///< Filename as a string
-    bool IsAngled;         ///< true if this was an include with angle brackets
-    bool IsMainModule;     ///< true if this was the first include in a file
-  };
-  std::vector<IncludeDirective> IncludeDirectives;
-  bool LookForMainModule;
-
-  ClangTidyCheck &Check;
-  SourceManager &SM;
+protected:
+  void processIncludeBlocks(const std::vector<unsigned> &Blocks) override;
 };
 } // namespace
 
@@ -69,39 +51,12 @@ static int getPriority(StringRef Filename, bool IsAngled, bool IsMainModule) {
   return 1;
 }
 
-void IncludeOrderPPCallbacks::InclusionDirective(
-    SourceLocation HashLoc, const Token &IncludeTok, StringRef FileName,
-    bool IsAngled, CharSourceRange FilenameRange, const FileEntry *File,
-    StringRef SearchPath, StringRef RelativePath, const Module *Imported) {
-  // We recognize the first include as a special main module header and want
-  // to leave it in the top position.
-  IncludeDirective ID = {HashLoc, FilenameRange, FileName, IsAngled, false};
-  if (LookForMainModule && !IsAngled) {
-    ID.IsMainModule = true;
-    LookForMainModule = false;
-  }
-  IncludeDirectives.push_back(std::move(ID));
-}
-
-void IncludeOrderPPCallbacks::EndOfMainFile() {
-  LookForMainModule = true;
-  if (IncludeDirectives.empty())
-    return;
-
-  // TODO: find duplicated includes.
-
-  // Form blocks of includes. We don't want to sort across blocks. This also
-  // implicitly makes us never reorder over #defines or #if directives.
-  // FIXME: We should be more careful about sorting below comments as we don't
-  // know if the comment refers to the next include or the whole block that
-  // follows.
-  std::vector<unsigned> Blocks(1, 0);
-  for (unsigned I = 1, E = IncludeDirectives.size(); I != E; ++I)
-    if (SM.getExpansionLineNumber(IncludeDirectives[I].Loc) !=
-        SM.getExpansionLineNumber(IncludeDirectives[I - 1].Loc) + 1)
-      Blocks.push_back(I);
-  Blocks.push_back(IncludeDirectives.size()); // Sentinel value.
-
+// We don't want to sort across blocks. This also implicitly makes us never
+// reorder over #defines or #if directives.
+// FIXME: We should be more careful about sorting below comments as we don't
+// know if the comment refers to the next include or the whole block that
+// follows.
+void IncludeOrderPPCallbacks::processIncludeBlocks(const std::vector<unsigned> &Blocks) {
   // Get a vector of indices.
   std::vector<unsigned> IncludeIndices;
   for (unsigned I = 0, E = IncludeDirectives.size(); I != E; ++I)
