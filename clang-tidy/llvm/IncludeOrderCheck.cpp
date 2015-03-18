@@ -57,7 +57,8 @@ static int getPriority(StringRef Filename, bool IsAngled, bool IsMainModule) {
 // FIXME: We should be more careful about sorting below comments as we don't
 // know if the comment refers to the next include or the whole block that
 // follows.
-void IncludeOrderPPCallbacks::processIncludeBlocks(const std::vector<unsigned> &Blocks) {
+void IncludeOrderPPCallbacks::processIncludeBlocks(
+    const std::vector<unsigned> &Blocks) {
   // Get a vector of indices.
   std::vector<unsigned> IncludeIndices;
   for (unsigned I = 0, E = IncludeDirectives.size(); I != E; ++I)
@@ -68,17 +69,17 @@ void IncludeOrderPPCallbacks::processIncludeBlocks(const std::vector<unsigned> &
     std::sort(IncludeIndices.begin() + Blocks[BI],
               IncludeIndices.begin() + Blocks[BI + 1],
               [this](unsigned LHSI, unsigned RHSI) {
-      IncludeDirective &LHS = IncludeDirectives[LHSI];
-      IncludeDirective &RHS = IncludeDirectives[RHSI];
+                IncludeDirective &LHS = IncludeDirectives[LHSI];
+                IncludeDirective &RHS = IncludeDirectives[RHSI];
 
-      int PriorityLHS =
-          getPriority(LHS.Filename, LHS.IsAngled, LHS.IsMainModule);
-      int PriorityRHS =
-          getPriority(RHS.Filename, RHS.IsAngled, RHS.IsMainModule);
+                int PriorityLHS =
+                    getPriority(LHS.Filename, LHS.IsAngled, LHS.IsMainModule);
+                int PriorityRHS =
+                    getPriority(RHS.Filename, RHS.IsAngled, RHS.IsMainModule);
 
-      return std::tie(PriorityLHS, LHS.Filename) <
-             std::tie(PriorityRHS, RHS.Filename);
-    });
+                return std::tie(PriorityLHS, LHS.Filename) <
+                       std::tie(PriorityRHS, RHS.Filename);
+              });
 
   // Emit a warning for each block and fixits for all changes within that block.
   for (unsigned BI = 0, BE = Blocks.size() - 1; BI != BE; ++BI) {
