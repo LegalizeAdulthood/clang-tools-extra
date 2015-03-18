@@ -15,7 +15,6 @@
 #include "DuplicateIncludeCheck.h"
 #include "ElseAfterReturnCheck.h"
 #include "FunctionSizeCheck.h"
-#include "RedundantInclude.h"
 #include "RedundantSmartptrGetCheck.h"
 #include "ShrinkToFitCheck.h"
 
