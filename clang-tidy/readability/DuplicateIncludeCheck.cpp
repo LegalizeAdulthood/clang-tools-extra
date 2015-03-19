@@ -9,6 +9,7 @@
 
 #include "DuplicateIncludeCheck.h"
 #include "../ClangTidy.h"
+#include "../utils/IncludeBlockPPCallbacks.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Lex/Preprocessor.h"
 #include <algorithm>
@@ -20,7 +21,7 @@ namespace readability {
 
 namespace {
 
-SourceLocation AdvanceBeyondCurrentLine(SourceManager &SM, SourceLocation Start,
+SourceLocation advanceBeyondCurrentLine(SourceManager &SM, SourceLocation Start,
                                         int Offset) {
   const FileID Id = SM.getFileID(Start);
   const unsigned LineNumber = SM.getSpellingLineNumber(Start);
@@ -64,9 +65,10 @@ void DuplicateIncludeCallbacks::InclusionDirective(
   }
 
   if (std::find(Files_.cbegin(), Files_.cend(), FileName) != Files_.end()) {
-    const auto Start =
-        AdvanceBeyondCurrentLine(SM_, HashLoc, -1).getLocWithOffset(-1);
-    const auto End = AdvanceBeyondCurrentLine(SM_, FilenameRange.getEnd(), 1);
+    const SourceLocation Start =
+        advanceBeyondCurrentLine(SM_, HashLoc, -1).getLocWithOffset(-1);
+    const SourceLocation End =
+        advanceBeyondCurrentLine(SM_, FilenameRange.getEnd(), 1);
     Check_.diag(HashLoc, "duplicate include")
         << FixItHint::CreateRemoval(SourceRange(Start, End));
   } else {
