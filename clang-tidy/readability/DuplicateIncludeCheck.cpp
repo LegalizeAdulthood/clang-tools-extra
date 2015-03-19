@@ -8,9 +8,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "DuplicateIncludeCheck.h"
-#include "../ClangTidy.h"
 #include "../utils/IncludeBlockPPCallbacks.h"
-#include "clang/Frontend/CompilerInstance.h"
 #include "clang/Lex/Preprocessor.h"
 #include <algorithm>
 #include <vector>
