@@ -36,7 +36,7 @@ SourceLocation advanceBeyondCurrentLine(SourceManager &SM, SourceLocation Start,
 class DuplicateIncludeCallbacks : public PPCallbacks {
 public:
   DuplicateIncludeCallbacks(DuplicateIncludeCheck &Check, SourceManager &SM)
-      : Check_(Check), SM_(SM) {}
+      : Check(Check), SM(SM) {}
 
   void InclusionDirective(SourceLocation HashLoc, const Token &IncludeTok,
                           StringRef FileName, bool IsAngled,
@@ -51,42 +51,42 @@ public:
                       const MacroDirective *MD) override;
 
 private:
-  std::vector<StringRef> Files_;
-  DuplicateIncludeCheck &Check_;
-  SourceManager &SM_;
+  std::vector<StringRef> Files;
+  DuplicateIncludeCheck &Check;
+  SourceManager &SM;
 };
 
 void DuplicateIncludeCallbacks::InclusionDirective(
     SourceLocation HashLoc, const Token &IncludeTok, StringRef FileName,
     bool IsAngled, CharSourceRange FilenameRange, const FileEntry *File,
     StringRef SearchPath, StringRef RelativePath, const Module *Imported) {
-  if (!SM_.isInMainFile(HashLoc)) {
+  if (!SM.isInMainFile(HashLoc)) {
     return;
   }
 
-  if (std::find(Files_.cbegin(), Files_.cend(), FileName) != Files_.end()) {
+  if (std::find(Files.cbegin(), Files.cend(), FileName) != Files.end()) {
     const SourceLocation Start =
-        advanceBeyondCurrentLine(SM_, HashLoc, -1).getLocWithOffset(-1);
+        advanceBeyondCurrentLine(SM, HashLoc, -1).getLocWithOffset(-1);
     const SourceLocation End =
-        advanceBeyondCurrentLine(SM_, FilenameRange.getEnd(), 1);
-    Check_.diag(HashLoc, "duplicate include")
+        advanceBeyondCurrentLine(SM, FilenameRange.getEnd(), 1);
+    Check.diag(HashLoc, "duplicate include")
         << FixItHint::CreateRemoval(SourceRange(Start, End));
   } else {
-    Files_.push_back(FileName);
+    Files.push_back(FileName);
   }
 }
 
 void DuplicateIncludeCallbacks::MacroDefined(const Token &MacroNameTok,
                                              const MacroDirective *MD) {
-  if (SM_.isInMainFile(MacroNameTok.getLocation())) {
-    Files_.clear();
+  if (SM.isInMainFile(MacroNameTok.getLocation())) {
+    Files.clear();
   }
 }
 
 void DuplicateIncludeCallbacks::MacroUndefined(const Token &MacroNameTok,
                                                const MacroDirective *MD) {
-  if (SM_.isInMainFile(MacroNameTok.getLocation())) {
-    Files_.clear();
+  if (SM.isInMainFile(MacroNameTok.getLocation())) {
+    Files.clear();
   }
 }
 
