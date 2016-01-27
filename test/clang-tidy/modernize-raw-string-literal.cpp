@@ -10,8 +10,18 @@ char const *const FormFeed{"goink\f\\frob"};
 char const *const CarraigeReturn{"goink\r\\frob"};
 char const *const HorizontalTab{"goink\t\\frob"};
 char const *const VerticalTab{"goink\v\\frob"};
-char const *const OctalNonPrintable{"\003"};
-char const *const HexNonPrintable{"\x03"};
+char const *const OctalNonPrintable{"\003\\"};
+char const *const HexNonPrintable{"\x03\\"};
+char const *const Delete{"\\\177"};
+char const *const AlreadyRaw{R"(foobie\\bletch)"};
+char const *const UTF8Literal{u8"foobie\\bletch"};
+char const *const UTF8RawLiteral{u8R"(foobie\\bletch)"};
+char16_t const *const UTF16Literal{u"foobie\\bletch"};
+char16_t const *const UTF16RawLiteral{uR"(foobie\\bletch)"};
+char32_t const *const UTF32Literal{U"foobie\\bletch"};
+char32_t const *const UTF32RawLiteral{UR"(foobie\\bletch)"};
+wchar_t const *const WideLiteral{L"foobie\\bletch"};
+wchar_t const *const WideRawLiteral{LR"(foobie\\bletch)"};
 
 char const *const NewLine{"goink\nfrob"};
 // CHECK-MESSAGES: :[[@LINE-1]]:27: warning: {{.*}} can be written as a raw string literal
