@@ -95,12 +95,8 @@ void RawStringLiteralCheck::registerMatchers(MatchFinder *Finder) {
 
 void RawStringLiteralCheck::check(const MatchFinder::MatchResult &Result) {
   const LangOptions &Options = Result.Context->getLangOpts();
-  // can't do this for non C++ code
-  if (!Options.CPlusPlus)
-    return;
-
-  // raw string literals require C++11 or later
-  if (!Options.CPlusPlus11 && !Options.CPlusPlus14 && !Options.CPlusPlus1z)
+  // Raw string literals require C++11 or later.
+  if (!Options.CPlusPlus && !Options.CPlusPlus11)
     return;
 
   if (const auto *Literal = Result.Nodes.getNodeAs<StringLiteral>("lit"))
@@ -110,15 +106,20 @@ void RawStringLiteralCheck::check(const MatchFinder::MatchResult &Result) {
 void RawStringLiteralCheck::preferRawStringLiterals(
     const MatchFinder::MatchResult &Result, const StringLiteral *Literal) {
   if (containsEscapedCharacters(Result, Literal)) {
-    SourceRange ReplacementRange = Literal->getSourceRange();
-    CharSourceRange CharRange = Lexer::makeFileCharRange(
-        CharSourceRange::getTokenRange(ReplacementRange), *Result.SourceManager,
-        Result.Context->getLangOpts());
-    StringRef Replacement = asRawStringLiteral(Literal);
-    diag(Literal->getLocStart(),
-         "escaped string literal can be written as a raw string literal")
-        << FixItHint::CreateReplacement(CharRange, Replacement);
+    replaceWithRawStringLiteral(Result, Literal);
   }
+}
+
+void RawStringLiteralCheck::replaceWithRawStringLiteral(
+    const MatchFinder::MatchResult &Result, const StringLiteral *Literal) {
+  SourceRange ReplacementRange = Literal->getSourceRange();
+  CharSourceRange CharRange = Lexer::makeFileCharRange(
+      CharSourceRange::getTokenRange(ReplacementRange), *Result.SourceManager,
+      Result.Context->getLangOpts());
+  StringRef Replacement = asRawStringLiteral(Literal);
+  diag(Literal->getLocStart(),
+       "escaped string literal can be written as a raw string literal")
+      << FixItHint::CreateReplacement(CharRange, Replacement);
 }
 
 } // namespace modernize

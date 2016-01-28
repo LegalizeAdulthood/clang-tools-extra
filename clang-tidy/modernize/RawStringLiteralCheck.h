@@ -32,6 +32,10 @@ private:
   void
   preferRawStringLiterals(const ast_matchers::MatchFinder::MatchResult &Result,
                           const StringLiteral *Literal);
+
+  void replaceWithRawStringLiteral(
+      const ast_matchers::MatchFinder::MatchResult &Result,
+      const StringLiteral *Literal);
 };
 
 } // namespace modernize
