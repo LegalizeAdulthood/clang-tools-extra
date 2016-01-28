@@ -29,10 +29,6 @@ public:
   void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
 
 private:
-  void
-  preferRawStringLiterals(const ast_matchers::MatchFinder::MatchResult &Result,
-                          const StringLiteral *Literal);
-
   void replaceWithRawStringLiteral(
       const ast_matchers::MatchFinder::MatchResult &Result,
       const StringLiteral *Literal);

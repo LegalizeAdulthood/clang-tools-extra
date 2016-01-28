@@ -11,7 +11,6 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
 #include "clang/Lex/Lexer.h"
-#include <iostream>
 #include <sstream>
 
 using namespace clang::ast_matchers;
@@ -112,14 +111,8 @@ void RawStringLiteralCheck::check(const MatchFinder::MatchResult &Result) {
     return;
 
   if (const auto *Literal = Result.Nodes.getNodeAs<StringLiteral>("lit"))
-    preferRawStringLiterals(Result, Literal);
-}
-
-void RawStringLiteralCheck::preferRawStringLiterals(
-    const MatchFinder::MatchResult &Result, const StringLiteral *Literal) {
-  if (containsEscapedCharacters(Result, Literal)) {
-    replaceWithRawStringLiteral(Result, Literal);
-  }
+    if (containsEscapedCharacters(Result, Literal))
+      replaceWithRawStringLiteral(Result, Literal);
 }
 
 void RawStringLiteralCheck::replaceWithRawStringLiteral(
