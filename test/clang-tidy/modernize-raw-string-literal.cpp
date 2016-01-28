@@ -13,6 +13,8 @@ char const *const VerticalTab{"goink\v\\frob"};
 char const *const OctalNonPrintable{"\003\\"};
 char const *const HexNonPrintable{"\x03\\"};
 char const *const Delete{"\\\177"};
+char const *const TrailingSpace{"A line with space. \n"};
+char const *const TrailingNewLine{"A single line.\n"};
 char const *const AlreadyRaw{R"(foobie\\bletch)"};
 char const *const UTF8Literal{u8"foobie\\bletch"};
 char const *const UTF8RawLiteral{u8R"(foobie\\bletch)"};
