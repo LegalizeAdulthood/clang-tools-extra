@@ -11,6 +11,7 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
 #include "clang/Lex/Lexer.h"
+#include <iostream>
 #include <sstream>
 
 using namespace clang::ast_matchers;
@@ -21,14 +22,25 @@ namespace modernize {
 
 namespace {
 
+bool endsWithNewLine(StringRef Text, size_t NewLinePos) {
+  return NewLinePos == Text.size() - 3;
+}
+
+bool spaceBeforeNewLine(StringRef Text, size_t NewLinePos) {
+  return NewLinePos > 0 && Text[NewLinePos - 1] == ' ';
+}
+
+bool contains(StringRef HayStack, StringRef Needle) {
+  return HayStack.find(Needle) != StringRef::npos;
+}
+
 bool containsEscapedCharacters(const MatchFinder::MatchResult &Result,
                                const StringLiteral *Literal) {
-  // we only transform ASCII string literals
   if (!Literal->isAscii())
     return false;
 
   StringRef Bytes = Literal->getBytes();
-  // non-printing escapes except newline disqualify this literal
+  // Non-printing escapes except newline disqualify this literal:
   // \007 = \a bell
   // \010 = \b backspace
   // \011 = \t horizontal tab
@@ -54,21 +66,21 @@ bool containsEscapedCharacters(const MatchFinder::MatchResult &Result,
   StringRef Text = Lexer::getSourceText(CharRange, *Result.SourceManager,
                                         Result.Context->getLangOpts());
 
-  // already a raw string literal if R comes before "
-  if (Text.find_first_of("R") < Text.find_first_of(R"(")"))
+  // Already a raw string literal if R comes before ".
+  if (Text.find('R') < Text.find('"'))
     return false;
 
-  const bool HasBackSlash = Text.find(R"(\\)") != StringRef::npos;
-  const bool HasNewLine = Text.find(R"(\n)") != StringRef::npos;
-  const bool HasQuote = Text.find(R"(\')") != StringRef::npos;
-  const bool HasDoubleQuote = Text.find(R"(\")") != StringRef::npos;
-  const bool HasQuestion = Text.find(R"(\?)") != StringRef::npos;
-  return HasBackSlash || HasNewLine || HasQuote || HasDoubleQuote ||
-         HasQuestion;
+  const size_t NewLinePos = Text.find(R"(\n)");
+  if (NewLinePos != StringRef::npos)
+    return !endsWithNewLine(Text, NewLinePos) &&
+           !spaceBeforeNewLine(Text, NewLinePos);
+
+  return contains(Text, R"(\\)") || contains(Text, R"(\')") ||
+         contains(Text, R"(\")") || contains(Text, R"(\?)");
 }
 
 bool containsDelimiter(StringRef Bytes, const std::string &Delimiter) {
-  return Bytes.find(")" + Delimiter + R"(")") != StringRef::npos;
+  return Bytes.find(")" + Delimiter + R"quote(")quote") != StringRef::npos;
 }
 
 std::string asRawStringLiteral(const StringLiteral *Literal) {
