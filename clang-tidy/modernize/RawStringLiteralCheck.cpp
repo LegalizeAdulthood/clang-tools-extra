@@ -13,6 +13,8 @@
 #include "clang/Lex/Lexer.h"
 #include <sstream>
 
+#include <iostream>
+
 using namespace clang::ast_matchers;
 
 namespace clang {
@@ -33,13 +35,23 @@ bool contains(StringRef HayStack, StringRef Needle) {
   return HayStack.find(Needle) != StringRef::npos;
 }
 
+bool containsEscapes(StringRef HayStack, StringRef Escapes) {
+  for (size_t BackSlash = HayStack.find('\\'); BackSlash != StringRef::npos;
+       BackSlash = HayStack.find('\\', BackSlash + 2)) {
+    if (Escapes.find(HayStack[BackSlash + 1]) == StringRef::npos)
+      return false;
+  }
+
+  return true;
+}
+
 bool containsEscapedCharacters(const MatchFinder::MatchResult &Result,
                                const StringLiteral *Literal) {
   if (!Literal->isAscii())
     return false;
 
   StringRef Bytes = Literal->getBytes();
-  // Non-printing escapes except newline disqualify this literal:
+  // Non-printing characters except newline disqualify this literal:
   // \007 = \a bell
   // \010 = \b backspace
   // \011 = \t horizontal tab
@@ -55,7 +67,7 @@ bool containsEscapedCharacters(const MatchFinder::MatchResult &Result,
                           "\177") != StringRef::npos)
     return false;
 
-  // \000 = NUL
+  // The NUL character disqualifies this literal.
   if (Bytes.find_first_of(StringRef("\000", 1)) != StringRef::npos)
     return false;
 
@@ -74,8 +86,7 @@ bool containsEscapedCharacters(const MatchFinder::MatchResult &Result,
     return !endsWithNewLine(Text, NewLinePos) &&
            !spaceBeforeNewLine(Text, NewLinePos);
 
-  return contains(Text, R"(\\)") || contains(Text, R"(\')") ||
-         contains(Text, R"(\")") || contains(Text, R"(\?)");
+  return containsEscapes(Text, R"lit('\"?x01)lit");
 }
 
 bool containsDelimiter(StringRef Bytes, const std::string &Delimiter) {
@@ -121,7 +132,7 @@ void RawStringLiteralCheck::replaceWithRawStringLiteral(
   CharSourceRange CharRange = Lexer::makeFileCharRange(
       CharSourceRange::getTokenRange(ReplacementRange), *Result.SourceManager,
       Result.Context->getLangOpts());
-  StringRef Replacement = asRawStringLiteral(Literal);
+  const std::string Replacement = asRawStringLiteral(Literal);
   diag(Literal->getLocStart(),
        "escaped string literal can be written as a raw string literal")
       << FixItHint::CreateReplacement(CharRange, Replacement);

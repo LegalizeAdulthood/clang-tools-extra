@@ -4,14 +4,14 @@ char const *const BackSlash{"goink\\frob"};
 // CHECK-MESSAGES: :[[@LINE-1]]:29: warning: escaped string literal can be written as a raw string literal [modernize-raw-string-literal]
 // CHECK-FIXES: {{^}}char const *const BackSlash{R"(goink\frob)"};{{$}}
 
-char const *const Bell{"goink\a\\frob"};
-char const *const BackSpace{"goink\b\\frob"};
-char const *const FormFeed{"goink\f\\frob"};
-char const *const CarraigeReturn{"goink\r\\frob"};
-char const *const HorizontalTab{"goink\t\\frob"};
-char const *const VerticalTab{"goink\v\\frob"};
-char const *const OctalNonPrintable{"\003\\"};
-char const *const HexNonPrintable{"\x03\\"};
+char const *const Bell{"goink\\\afrob"};
+char const *const BackSpace{"goink\\\bfrob"};
+char const *const FormFeed{"goink\\\ffrob"};
+char const *const CarraigeReturn{"goink\\\rfrob"};
+char const *const HorizontalTab{"goink\\\tfrob"};
+char const *const VerticalTab{"goink\\\vfrob"};
+char const *const OctalNonPrintable{"\\\003"};
+char const *const HexNonPrintable{"\\\x03"};
 char const *const Delete{"\\\177"};
 char const *const TrailingSpace{"A line \\with space. \n"};
 char const *const TrailingNewLine{"A single \\line.\n"};
@@ -25,10 +25,11 @@ char32_t const *const UTF32RawLiteral{UR"(foobie\\bletch)"};
 wchar_t const *const WideLiteral{L"foobie\\bletch"};
 wchar_t const *const WideRawLiteral{LR"(foobie\\bletch)"};
 
-char const *const NewLine{"goink\nfrob"};
+char const *const NewLine{"goink\nfrob\n"};
 // CHECK-MESSAGES: :[[@LINE-1]]:27: warning: {{.*}} can be written as a raw string literal
 // CHECK-FIXES: {{^}}char const *const NewLine{R"(goink{{$}}
-// CHECK-FIXES-NEXT: {{^}}frob)"};{{$}}
+// CHECK-FIXES-NEXT: {{^}}frob{{$}}
+// CHECK-FIXES-NEXT: {{^}})"};{{$}}
 
 char const *const SingleQuote{"goink\'frob"};
 // CHECK-MESSAGES: :[[@LINE-1]]:31: warning: {{.*}} can be written as a raw string literal
