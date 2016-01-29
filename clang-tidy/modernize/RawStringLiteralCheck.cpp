@@ -11,9 +11,6 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
 #include "clang/Lex/Lexer.h"
-#include <sstream>
-
-#include <iostream>
 
 using namespace clang::ast_matchers;
 
@@ -97,13 +94,7 @@ std::string asRawStringLiteral(const StringLiteral *Literal) {
   const StringRef Bytes = Literal->getBytes();
   std::string Delimiter;
   for (int Counter = 0; containsDelimiter(Bytes, Delimiter); ++Counter) {
-    if (Counter == 0) {
-      Delimiter = "lit";
-    } else {
-      std::ostringstream Str;
-      Str << "lit" << Counter;
-      Delimiter = Str.str();
-    }
+    Delimiter = (Counter == 0) ? "lit" : "lit" + std::to_string(Counter);
   }
 
   return (R"(R")" + Delimiter + "(" + Bytes + ")" + Delimiter + R"(")").str();
@@ -116,26 +107,24 @@ void RawStringLiteralCheck::registerMatchers(MatchFinder *Finder) {
 }
 
 void RawStringLiteralCheck::check(const MatchFinder::MatchResult &Result) {
-  const LangOptions &Options = Result.Context->getLangOpts();
   // Raw string literals require C++11 or later.
-  if (!Options.CPlusPlus && !Options.CPlusPlus11)
+  if (!Result.Context->getLangOpts().CPlusPlus11)
     return;
 
-  if (const auto *Literal = Result.Nodes.getNodeAs<StringLiteral>("lit"))
+  if (const auto *Literal = Result.Nodes.getNodeAs<StringLiteral>("lit")) {
     if (containsEscapedCharacters(Result, Literal))
       replaceWithRawStringLiteral(Result, Literal);
+  }
 }
 
 void RawStringLiteralCheck::replaceWithRawStringLiteral(
     const MatchFinder::MatchResult &Result, const StringLiteral *Literal) {
-  SourceRange ReplacementRange = Literal->getSourceRange();
   CharSourceRange CharRange = Lexer::makeFileCharRange(
-      CharSourceRange::getTokenRange(ReplacementRange), *Result.SourceManager,
-      Result.Context->getLangOpts());
-  const std::string Replacement = asRawStringLiteral(Literal);
+      CharSourceRange::getTokenRange(Literal->getSourceRange()),
+      *Result.SourceManager, Result.Context->getLangOpts());
   diag(Literal->getLocStart(),
        "escaped string literal can be written as a raw string literal")
-      << FixItHint::CreateReplacement(CharRange, Replacement);
+      << FixItHint::CreateReplacement(CharRange, asRawStringLiteral(Literal));
 }
 
 } // namespace modernize
