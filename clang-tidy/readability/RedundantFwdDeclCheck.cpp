@@ -16,12 +16,12 @@ namespace clang {
 namespace tidy {
 namespace readability {
 
-void RedundantFwdDecl::registerMatchers(ast_matchers::MatchFinder *Finder) {
+void RedundantFwdDeclCheck::registerMatchers(ast_matchers::MatchFinder *Finder) {
   Finder->addMatcher(recordDecl(isExpansionInMainFile()).bind("decl"), this);
 }
 
 void
-RedundantFwdDecl::check(const ast_matchers::MatchFinder::MatchResult &Result) {
+RedundantFwdDeclCheck::check(const ast_matchers::MatchFinder::MatchResult &Result) {
   if (auto Record = Result.Nodes.getDeclAs<RecordDecl>("decl")) {
     if (std::find(Names_.begin(), Names_.end(), Record->getName()) != Names_.end()) {
       diag(Record->getLocStart(), "redundant forward declaration");

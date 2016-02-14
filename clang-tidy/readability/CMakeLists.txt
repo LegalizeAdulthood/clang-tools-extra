@@ -12,7 +12,7 @@ add_clang_library(clangTidyReadabilityModule
   NamespaceCommentCheck.cpp
   ReadabilityTidyModule.cpp
   RedundantControlFlowCheck.cpp
-  RedundantFwdDecl.cpp
+  RedundantFwdDeclCheck.cpp
   RedundantStringCStrCheck.cpp
   RedundantSmartptrGetCheck.cpp
   SimplifyBooleanExprCheck.cpp

@@ -18,9 +18,9 @@ namespace tidy {
 namespace readability {
 
 /// \brief Find and remove redundant forward declarations.
-class RedundantFwdDecl : public ClangTidyCheck {
+class RedundantFwdDeclCheck : public ClangTidyCheck {
 public:
-  RedundantFwdDecl(StringRef Name, ClangTidyContext *Context)
+  RedundantFwdDeclCheck(StringRef Name, ClangTidyContext *Context)
       : ClangTidyCheck(Name, Context) {}
   void registerMatchers(ast_matchers::MatchFinder *Finder) override;
   void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
