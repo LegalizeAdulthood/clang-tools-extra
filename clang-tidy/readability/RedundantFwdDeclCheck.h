@@ -11,6 +11,8 @@
 #define LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_READABILITY_REDUNDANT_FWD_DECL_H
 
 #include "../ClangTidy.h"
+#include <map>
+#include <string>
 #include <vector>
 
 namespace clang {
@@ -26,7 +28,7 @@ public:
   void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
 
 private:
-  std::vector<StringRef> Names_;
+  std::map<std::string, SourceLocation> NameLocs;
 };
 
 } // namespace readability

@@ -18,17 +18,21 @@ namespace tidy {
 namespace readability {
 
 void RedundantFwdDeclCheck::registerMatchers(MatchFinder *Finder) {
-  Finder->addMatcher(recordDecl(isExpansionInMainFile()).bind("decl"), this);
+  Finder->addMatcher(recordDecl().bind("decl"), this);
 }
 
 void
 RedundantFwdDeclCheck::check(const MatchFinder::MatchResult &Result) {
-  if (auto Record = Result.Nodes.getDeclAs<RecordDecl>("decl")) {
-    if (std::find(Names_.begin(), Names_.end(), Record->getName()) != Names_.end()) {
+  auto Record = Result.Nodes.getDeclAs<RecordDecl>("decl");
+  const std::string Name = Record->getName().str();
+  const SourceLocation Loc = Record->getLocStart();
+  const auto NameLoc = NameLocs.find(Name);
+  if (NameLoc != NameLocs.end())
+  {
+    if (NameLoc->second != Loc)
       diag(Record->getLocStart(), "redundant forward declaration");
-    } else {
-      Names_.push_back(Record->getName());
-    }
+  } else {
+    NameLocs[Name] = Loc;
   }
 }
 
