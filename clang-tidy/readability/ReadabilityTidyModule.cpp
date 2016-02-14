@@ -50,7 +50,7 @@ public:
         "readability-named-parameter");
     CheckFactories.registerCheck<RedundantControlFlowCheck>(
         "readability-redundant-control-flow");
-    CheckFactories.registerCheck<RedundantFwdDeclCHeck>(
+    CheckFactories.registerCheck<RedundantFwdDeclCheck>(
          "readability-redundant-fwd-decl");
     CheckFactories.registerCheck<RedundantSmartptrGetCheck>(
         "readability-redundant-smartptr-get");

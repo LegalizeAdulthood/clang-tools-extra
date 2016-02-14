@@ -7,8 +7,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "RedundantFwdDecl.h"
+#include "RedundantFwdDeclCheck.h"
 #include "clang/ASTMatchers/ASTMatchers.h"
+#include "clang/ASTMatchers/ASTMatchFinder.h"
 
 using namespace clang::ast_matchers;
 
@@ -16,12 +17,12 @@ namespace clang {
 namespace tidy {
 namespace readability {
 
-void RedundantFwdDeclCheck::registerMatchers(ast_matchers::MatchFinder *Finder) {
+void RedundantFwdDeclCheck::registerMatchers(MatchFinder *Finder) {
   Finder->addMatcher(recordDecl(isExpansionInMainFile()).bind("decl"), this);
 }
 
 void
-RedundantFwdDeclCheck::check(const ast_matchers::MatchFinder::MatchResult &Result) {
+RedundantFwdDeclCheck::check(const MatchFinder::MatchResult &Result) {
   if (auto Record = Result.Nodes.getDeclAs<RecordDecl>("decl")) {
     if (std::find(Names_.begin(), Names_.end(), Record->getName()) != Names_.end()) {
       diag(Record->getLocStart(), "redundant forward declaration");
