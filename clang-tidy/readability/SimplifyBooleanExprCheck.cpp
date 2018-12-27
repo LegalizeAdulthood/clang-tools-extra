@@ -47,8 +47,15 @@ const char IfAssignBoolId[] = "if-assign";
 const char IfAssignNotBoolId[] = "if-assign-not";
 const char IfAssignObjId[] = "if-assign-obj";
 const char CompoundReturnId[] = "compound-return";
+const char CompoundIfId[] = "compound-if";
 const char CompoundBoolId[] = "compound-bool";
 const char CompoundNotBoolId[] = "compound-bool-not";
+const char CaseId[] = "case";
+const char CaseCompoundBoolId[] = "case-compound-bool";
+const char CaseCompoundNotBoolId[] = "case-compound-bool-not";
+const char DefaultId[] = "default";
+const char DefaultCompoundBoolId[] = "default-compound-bool";
+const char DefaultCompoundNotBoolId[] = "default-compound-bool-not";
 
 const char IfStmtId[] = "if";
 
@@ -319,7 +326,7 @@ bool containsDiscardedTokens(const MatchFinder::MatchResult &Result,
 } // namespace
 
 class SimplifyBooleanExprCheck::Visitor : public RecursiveASTVisitor<Visitor> {
- public:
+public:
   Visitor(SimplifyBooleanExprCheck *Check,
           const MatchFinder::MatchResult &Result)
       : Check(Check), Result(Result) {}
@@ -329,11 +336,10 @@ class SimplifyBooleanExprCheck::Visitor : public RecursiveASTVisitor<Visitor> {
     return true;
   }
 
- private:
+private:
   SimplifyBooleanExprCheck *Check;
   const MatchFinder::MatchResult &Result;
 };
-
 
 SimplifyBooleanExprCheck::SimplifyBooleanExprCheck(StringRef Name,
                                                    ClangTidyContext *Context)
@@ -361,8 +367,8 @@ void SimplifyBooleanExprCheck::reportBinOp(
   const auto *LHS = Op->getLHS()->IgnoreParenImpCasts();
   const auto *RHS = Op->getRHS()->IgnoreParenImpCasts();
 
-  const CXXBoolLiteralExpr *Bool = nullptr;
-  const Expr *Other = nullptr;
+  const CXXBoolLiteralExpr *Bool;
+  const Expr *Other;
   if ((Bool = dyn_cast<CXXBoolLiteralExpr>(LHS)))
     Other = RHS;
   else if ((Bool = dyn_cast<CXXBoolLiteralExpr>(RHS)))
@@ -377,46 +383,46 @@ void SimplifyBooleanExprCheck::reportBinOp(
   if (!isa<CXXBoolLiteralExpr>(Other) && containsBoolLiteral(Other))
     return;
 
-  bool BoolValue = Bool->getValue();
+  const bool BoolValue = Bool->getValue();
 
-  auto replaceWithExpression = [this, &Result, LHS, RHS, Bool](
-                                   const Expr *ReplaceWith, bool Negated) {
-    std::string Replacement =
-        replacementExpression(Result, Negated, ReplaceWith);
-    SourceRange Range(LHS->getBeginLoc(), RHS->getEndLoc());
-    issueDiag(Result, Bool->getBeginLoc(), SimplifyOperatorDiagnostic, Range,
-              Replacement);
-  };
+  const auto replaceWithExpression =
+      [this, &Result, LHS, RHS, Bool](const Expr *ReplaceWith, bool Negated) {
+        const std::string Replacement =
+            replacementExpression(Result, Negated, ReplaceWith);
+        SourceRange Range(LHS->getBeginLoc(), RHS->getEndLoc());
+        issueDiag(Result, Bool->getBeginLoc(), SimplifyOperatorDiagnostic,
+                  Range, Replacement);
+      };
 
   switch (Op->getOpcode()) {
-    case BO_LAnd:
-      if (BoolValue) {
-        // expr && true -> expr
-        replaceWithExpression(Other, /*Negated=*/false);
-      } else {
-        // expr && false -> false
-        replaceWithExpression(Bool, /*Negated=*/false);
-      }
-      break;
-    case BO_LOr:
-      if (BoolValue) {
-        // expr || true -> true
-        replaceWithExpression(Bool, /*Negated=*/false);
-      } else {
-        // expr || false -> expr
-        replaceWithExpression(Other, /*Negated=*/false);
-      }
-      break;
-    case BO_EQ:
-      // expr == true -> expr, expr == false -> !expr
-      replaceWithExpression(Other, /*Negated=*/!BoolValue);
-      break;
-    case BO_NE:
-      // expr != true -> !expr, expr != false -> expr
-      replaceWithExpression(Other, /*Negated=*/BoolValue);
-      break;
-    default:
-      break;
+  case BO_LAnd:
+    if (BoolValue) {
+      // expr && true -> expr
+      replaceWithExpression(Other, /*Negated=*/false);
+    } else {
+      // expr && false -> false
+      replaceWithExpression(Bool, /*Negated=*/false);
+    }
+    break;
+  case BO_LOr:
+    if (BoolValue) {
+      // expr || true -> true
+      replaceWithExpression(Bool, /*Negated=*/false);
+    } else {
+      // expr || false -> expr
+      replaceWithExpression(Other, /*Negated=*/false);
+    }
+    break;
+  case BO_EQ:
+    // expr == true -> expr, expr == false -> !expr
+    replaceWithExpression(Other, /*Negated=*/!BoolValue);
+    break;
+  case BO_NE:
+    // expr != true -> !expr, expr != false -> expr
+    replaceWithExpression(Other, /*Negated=*/BoolValue);
+    break;
+  default:
+    break;
   }
 }
 
@@ -499,6 +505,42 @@ void SimplifyBooleanExprCheck::matchCompoundIfReturnsBool(MatchFinder *Finder,
       this);
 }
 
+void SimplifyBooleanExprCheck::matchCaseIfReturnsBool(MatchFinder *Finder,
+                                                      bool Value,
+                                                      StringRef Id) {
+  // binding to the returnStmt matched is pointless because we can't guarantee
+  // anything about the ordering of the return statement and the case statement.
+  // If only we had a statement sequence matcher...
+  Finder->addMatcher(
+      switchStmt(
+          has(compoundStmt(
+                  has(caseStmt(hasDescendant(ifStmt(hasThen(returnsBool(Value)),
+                                                    unless(hasElse(stmt())))
+                                                 .bind(CompoundIfId)))
+                          .bind(CaseId)),
+                  has(returnStmt(has(cxxBoolLiteral(equals(!Value))))))
+                  .bind(Id))),
+      this);
+}
+
+void SimplifyBooleanExprCheck::matchDefaultIfReturnsBool(MatchFinder *Finder,
+                                                         bool Value,
+                                                         StringRef Id) {
+  // binding to the returnStmt matched is pointless because we can't guarantee
+  // anything about the ordering of the return statement and the case statement.
+  // If only we had a statement sequence matcher...
+  Finder->addMatcher(
+      switchStmt(has(
+          compoundStmt(
+              has(defaultStmt(hasDescendant(ifStmt(hasThen(returnsBool(Value)),
+                                                   unless(hasElse(stmt())))
+                                                .bind(CompoundIfId)))
+                      .bind(DefaultId)),
+              has(returnStmt(has(cxxBoolLiteral(equals(!Value))))))
+              .bind(Id))),
+      this);
+}
+
 void SimplifyBooleanExprCheck::storeOptions(ClangTidyOptions::OptionMap &Opts) {
   Options.store(Opts, "ChainedConditionalReturn", ChainedConditionalReturn);
   Options.store(Opts, "ChainedConditionalAssignment",
@@ -522,6 +564,12 @@ void SimplifyBooleanExprCheck::registerMatchers(MatchFinder *Finder) {
 
   matchCompoundIfReturnsBool(Finder, true, CompoundBoolId);
   matchCompoundIfReturnsBool(Finder, false, CompoundNotBoolId);
+
+  matchCaseIfReturnsBool(Finder, true, CaseCompoundBoolId);
+  matchCaseIfReturnsBool(Finder, false, CaseCompoundNotBoolId);
+
+  matchDefaultIfReturnsBool(Finder, true, DefaultCompoundBoolId);
+  matchDefaultIfReturnsBool(Finder, false, DefaultCompoundNotBoolId);
 }
 
 void SimplifyBooleanExprCheck::check(const MatchFinder::MatchResult &Result) {
@@ -535,27 +583,41 @@ void SimplifyBooleanExprCheck::check(const MatchFinder::MatchResult &Result) {
     replaceWithElseStatement(Result, FalseConditionRemoved);
   else if (const auto *Ternary =
                Result.Nodes.getNodeAs<ConditionalOperator>(TernaryId))
-    replaceWithCondition(Result, Ternary);
+    replaceWithCondition(Result, Ternary, false);
   else if (const auto *TernaryNegated =
                Result.Nodes.getNodeAs<ConditionalOperator>(TernaryNegatedId))
     replaceWithCondition(Result, TernaryNegated, true);
   else if (const auto *If = Result.Nodes.getNodeAs<IfStmt>(IfReturnsBoolId))
-    replaceWithReturnCondition(Result, If);
+    replaceWithReturnCondition(Result, If, false);
   else if (const auto *IfNot =
                Result.Nodes.getNodeAs<IfStmt>(IfReturnsNotBoolId))
     replaceWithReturnCondition(Result, IfNot, true);
   else if (const auto *IfAssign =
                Result.Nodes.getNodeAs<IfStmt>(IfAssignBoolId))
-    replaceWithAssignment(Result, IfAssign);
+    replaceWithAssignment(Result, IfAssign, false);
   else if (const auto *IfAssignNot =
                Result.Nodes.getNodeAs<IfStmt>(IfAssignNotBoolId))
     replaceWithAssignment(Result, IfAssignNot, true);
   else if (const auto *Compound =
                Result.Nodes.getNodeAs<CompoundStmt>(CompoundBoolId))
-    replaceCompoundReturnWithCondition(Result, Compound);
-  else if (const auto *Compound =
+    replaceCompoundReturnWithCondition(Result, Compound, false);
+  else if (const auto *CompoundNot =
                Result.Nodes.getNodeAs<CompoundStmt>(CompoundNotBoolId))
-    replaceCompoundReturnWithCondition(Result, Compound, true);
+    replaceCompoundReturnWithCondition(Result, CompoundNot, true);
+  else if (const auto *CaseCompound =
+               Result.Nodes.getNodeAs<CompoundStmt>(CaseCompoundBoolId))
+    replaceCaseCompoundReturnWithCondition(Result, CaseCompound, false);
+  else if (const auto *CaseCompoundNot =
+               Result.Nodes.getNodeAs<CompoundStmt>(CaseCompoundNotBoolId))
+    replaceCaseCompoundReturnWithCondition(Result, CaseCompoundNot, true);
+  else if (const auto *DefaultCompound =
+               Result.Nodes.getNodeAs<CompoundStmt>(DefaultCompoundBoolId))
+    replaceDefaultCompoundReturnWithCondition(Result, DefaultCompound, false);
+  else if (const auto *DefaultCompoundNot =
+               Result.Nodes.getNodeAs<CompoundStmt>(DefaultCompoundNotBoolId))
+    replaceDefaultCompoundReturnWithCondition(Result, DefaultCompoundNot, true);
+  else if (const auto TU = Result.Nodes.getNodeAs<Decl>("top"))
+    Visitor(this, Result).TraverseDecl(const_cast<Decl *>(TU));
 }
 
 void SimplifyBooleanExprCheck::issueDiag(
@@ -635,7 +697,7 @@ void SimplifyBooleanExprCheck::replaceCompoundReturnWithCondition(
             continue;
 
           const Expr *Condition = If->getCond();
-          std::string Replacement =
+          const std::string Replacement =
               "return " + replacementExpression(Result, Negated, Condition);
           issueDiag(
               Result, Lit->getBeginLoc(), SimplifyConditionalReturnDiagnostic,
@@ -649,6 +711,87 @@ void SimplifyBooleanExprCheck::replaceCompoundReturnWithCondition(
       BeforeIf = nullptr;
     }
   }
+}
+
+void SimplifyBooleanExprCheck::replaceSwitchCaseCompoundReturnWithCondition(
+    const MatchFinder::MatchResult &Result, const CompoundStmt *Compound,
+    bool Negated, const SwitchCase *SwitchCase) {
+  assert(SwitchCase != nullptr);
+
+  // The body shouldn't be empty because the matcher ensures that it must
+  // contain at least two statements:
+  // 1) A `return` statement returning a boolean literal `false` or `true`
+  // 2) An `if` statement with no `else` clause that consists of a single
+  //    `return` statement returning the opposite boolean literal `true` or
+  //    `false`.
+  assert(Compound->size() >= 2);
+
+  // We're looking for something like:
+  //
+  // switch (expr) {
+  // case 10:
+  //   if (cond) return false;
+  //   return true;
+  // }
+  //
+  // The matcher ensures that the case/if combination is already there,
+  // and that there is a return statement of this form somewhere in the
+  // compound statement associated with the switch contains a return
+  // statement of this form, but the return statement could be anywhere
+  // within the compound statement, so we have to manually check to see
+  // if the next statement after the if contains a return statement of
+  // the correct form.  Ideally we'd be able to express this with the
+  // matchers, but that is currently impossible.
+  //
+  const auto *If = dyn_cast<IfStmt>(SwitchCase->getSubStmt());
+  assert(If != nullptr);
+  const CXXBoolLiteralExpr *Lit = stmtReturnsBool(If, Negated);
+  assert(Lit != nullptr);
+
+  // Advance to the matched CaseStmt
+  CompoundStmt::const_body_iterator Current = Compound->body_begin();
+  while (Current != Compound->body_end() && *Current != SwitchCase)
+    ++Current;
+  assert(Current != Compound->body_end());
+
+  // Advance to the next statement, watch out for something like:
+  //
+  // switch (expr) {
+  // case 0:
+  //   return true;
+  //
+  // case 1:
+  //   if (cond) return false;
+  // }
+  //
+  ++Current;
+  if (Current == Compound->body_end())
+    return;
+
+  if (const auto *Ret = dyn_cast<ReturnStmt>(*Current)) {
+    if (stmtReturnsBool(Ret, !Negated)) {
+      const Expr *Condition = If->getCond();
+      const std::string Replacement =
+          "return " + replacementExpression(Result, Negated, Condition);
+      issueDiag(Result, Lit->getBeginLoc(), SimplifyConditionalReturnDiagnostic,
+                SourceRange(If->getBeginLoc(), Ret->getEndLoc()), Replacement);
+    }
+  }
+}
+
+void SimplifyBooleanExprCheck::replaceCaseCompoundReturnWithCondition(
+    const MatchFinder::MatchResult &Result, const CompoundStmt *Compound,
+    bool Negated) {
+  replaceSwitchCaseCompoundReturnWithCondition(
+      Result, Compound, Negated, Result.Nodes.getNodeAs<CaseStmt>(CaseId));
+}
+
+void SimplifyBooleanExprCheck::replaceDefaultCompoundReturnWithCondition(
+    const MatchFinder::MatchResult &Result, const CompoundStmt *Compound,
+    bool Negated) {
+  replaceSwitchCaseCompoundReturnWithCondition(
+      Result, Compound, Negated,
+      Result.Nodes.getNodeAs<DefaultStmt>(DefaultId));
 }
 
 void SimplifyBooleanExprCheck::replaceWithAssignment(
