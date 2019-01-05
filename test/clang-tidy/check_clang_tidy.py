@@ -41,33 +41,7 @@ def write_file(file_name, text):
 def csv(string):
   return string.split(',')
 
-def main():
-  parser = argparse.ArgumentParser()
-  parser.add_argument('-expect-clang-tidy-error', action='store_true')
-  parser.add_argument('-resource-dir')
-  parser.add_argument('-assume-filename')
-  parser.add_argument('input_file_name')
-  parser.add_argument('check_name')
-  parser.add_argument('temp_file_name')
-  parser.add_argument('-check-suffix', '-check-suffixes',
-                      default=[''], type=csv,
-                      help="comma-separated list of FileCheck suffixes")
-
-  args, extra_args = parser.parse_known_args()
-
-  resource_dir = args.resource_dir
-  assume_file_name = args.assume_filename
-  input_file_name = args.input_file_name
-  check_name = args.check_name
-  temp_file_name = args.temp_file_name
-  expect_clang_tidy_error = args.expect_clang_tidy_error
-
-  file_name_with_extension = assume_file_name or input_file_name
-  _, extension = os.path.splitext(file_name_with_extension)
-  if extension not in ['.c', '.hpp', '.m', '.mm']:
-    extension = '.cpp'
-  temp_file_name = temp_file_name + extension
-
+def get_extra_args(resource_dir, extension, extra_args):
   clang_tidy_extra_args = extra_args
   if len(clang_tidy_extra_args) == 0:
     clang_tidy_extra_args = ['--']
@@ -84,9 +58,9 @@ def main():
   if resource_dir is not None:
     clang_tidy_extra_args.append('-resource-dir=%s' % resource_dir)
 
-  with open(input_file_name, 'r') as input_file:
-    input_text = input_file.read()
+  return clang_tidy_extra_args
 
+def get_prefixes(check_suffix, input_text):
   check_fixes_prefixes = []
   check_messages_prefixes = []
   check_notes_prefixes = []
@@ -95,7 +69,7 @@ def main():
   has_check_messages = False
   has_check_notes = False
 
-  for check in args.check_suffix:
+  for check in check_suffix:
     if check and not re.match('^[A-Z0-9\-]+$', check):
       sys.exit('Only A..Z, 0..9 and "-" are ' +
         'allowed in check suffixes list, but "%s" was given' % (check))
@@ -125,15 +99,91 @@ def main():
     check_messages_prefixes.append(check_messages_prefix)
     check_notes_prefixes.append(check_notes_prefix)
 
+  return (has_check_fixes, has_check_messages, has_check_notes, \
+    check_fixes_prefixes, check_messages_prefixes, check_notes_prefixes)
+
+def try_run(args, raise_error = True):
+  try:
+    process_output = \
+      subprocess.check_output(args, stderr=subprocess.STDOUT).decode()
+  except subprocess.CalledProcessError as e:
+    process_output = e.output.decode()
+    print('%s failed:\n%s' % (' '.join(args), process_output))
+    if raise_error:
+      raise
+  return process_output
+
+def check_fixes(check_fixes_prefixes, has_check_fixes, input_file_name, temp_file_name):
+  if has_check_fixes:
+    try_run(['FileCheck', '-input-file=' + temp_file_name, input_file_name,
+            '-check-prefixes=' + ','.join(check_fixes_prefixes),
+            '-strict-whitespace'])
+  return
+
+def check_messages(check_messages_prefixes, has_check_messages, clang_tidy_output, input_file_name, temp_file_name):
+  if has_check_messages:
+    messages_file = temp_file_name + '.msg'
+    write_file(messages_file, clang_tidy_output)
+    try_run(['FileCheck', '-input-file=' + messages_file, input_file_name,
+           '-check-prefixes=' + ','.join(check_messages_prefixes),
+           '-implicit-check-not={{warning|error}}:'])
+  return
+
+def check_notes(check_notes_prefixes, has_check_notes, clang_tidy_output, input_file_name, temp_file_name):
+  if has_check_notes:
+    notes_file = temp_file_name + '.notes'
+    filtered_output = [line for line in clang_tidy_output.splitlines()
+                       if not "note: FIX-IT applied" in line]
+    write_file(notes_file, '\n'.join(filtered_output))
+    try_run(['FileCheck', '-input-file=' + notes_file, input_file_name,
+           '-check-prefixes=' + ','.join(check_notes_prefixes),
+           '-implicit-check-not={{note|warning|error}}:'])
+  return
+
+def main():
+  parser = argparse.ArgumentParser()
+  parser.add_argument('-expect-clang-tidy-error', action='store_true')
+  parser.add_argument('-resource-dir')
+  parser.add_argument('-assume-filename')
+  parser.add_argument('input_file_name')
+  parser.add_argument('check_name')
+  parser.add_argument('temp_file_name')
+  parser.add_argument('-check-suffix', '-check-suffixes',
+                      default=[''], type=csv,
+                      help="comma-separated list of FileCheck suffixes")
+
+  args, extra_args = parser.parse_known_args()
+
+  resource_dir = args.resource_dir
+  assume_file_name = args.assume_filename
+  input_file_name = args.input_file_name
+  check_name = args.check_name
+  temp_file_name = args.temp_file_name
+  expect_clang_tidy_error = args.expect_clang_tidy_error
+
+  file_name_with_extension = assume_file_name or input_file_name
+  _, extension = os.path.splitext(file_name_with_extension)
+  if extension not in ['.c', '.hpp', '.m', '.mm']:
+    extension = '.cpp'
+  temp_file_name = temp_file_name + extension
+
+  clang_tidy_extra_args = get_extra_args(resource_dir, extension, extra_args)
+
+  with open(input_file_name, 'r') as input_file:
+    input_text = input_file.read()
+
+  has_check_fixes, has_check_messages, has_check_notes, \
+    check_fixes_prefixes, check_messages_prefixes, check_notes_prefixes = \
+    get_prefixes(args.check_suffix, input_text)
+
   assert has_check_fixes or has_check_messages or has_check_notes
+
   # Remove the contents of the CHECK lines to avoid CHECKs matching on
   # themselves.  We need to keep the comments to preserve line numbers while
   # avoiding empty lines which could potentially trigger formatting-related
   # checks.
   cleaned_test = re.sub('// *CHECK-[A-Z0-9\-]*:[^\r\n]*', '//', input_text)
-
   write_file(temp_file_name, cleaned_test)
-
   original_file_name = temp_file_name + ".orig"
   write_file(original_file_name, cleaned_test)
 
@@ -142,66 +192,19 @@ def main():
   if expect_clang_tidy_error:
     args.insert(0, 'not')
   print('Running ' + repr(args) + '...')
-  try:
-    clang_tidy_output = \
-        subprocess.check_output(args, stderr=subprocess.STDOUT).decode()
-  except subprocess.CalledProcessError as e:
-    print('clang-tidy failed:\n' + e.output.decode())
-    raise
-
+  clang_tidy_output = try_run(args)
   print('------------------------ clang-tidy output -----------------------\n' +
         clang_tidy_output +
         '\n------------------------------------------------------------------')
 
-  try:
-    diff_output = subprocess.check_output(
-        ['diff', '-u', original_file_name, temp_file_name],
-        stderr=subprocess.STDOUT)
-  except subprocess.CalledProcessError as e:
-    diff_output = e.output
-
+  diff_output = try_run(['diff', '-u', original_file_name, temp_file_name], False)
   print('------------------------------ Fixes -----------------------------\n' +
-        diff_output.decode() +
+        diff_output +
         '\n------------------------------------------------------------------')
 
-  if has_check_fixes:
-    try:
-      subprocess.check_output(
-          ['FileCheck', '-input-file=' + temp_file_name, input_file_name,
-           '-check-prefixes=' + ','.join(check_fixes_prefixes),
-           '-strict-whitespace'],
-          stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError as e:
-      print('FileCheck failed:\n' + e.output.decode())
-      raise
-
-  if has_check_messages:
-    messages_file = temp_file_name + '.msg'
-    write_file(messages_file, clang_tidy_output)
-    try:
-      subprocess.check_output(
-          ['FileCheck', '-input-file=' + messages_file, input_file_name,
-           '-check-prefixes=' + ','.join(check_messages_prefixes),
-           '-implicit-check-not={{warning|error}}:'],
-          stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError as e:
-      print('FileCheck failed:\n' + e.output.decode())
-      raise
-
-  if has_check_notes:
-    notes_file = temp_file_name + '.notes'
-    filtered_output = [line for line in clang_tidy_output.splitlines()
-                       if not "note: FIX-IT applied" in line]
-    write_file(notes_file, '\n'.join(filtered_output))
-    try:
-      subprocess.check_output(
-          ['FileCheck', '-input-file=' + notes_file, input_file_name,
-           '-check-prefixes=' + ','.join(check_notes_prefixes),
-           '-implicit-check-not={{note|warning|error}}:'],
-          stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError as e:
-      print('FileCheck failed:\n' + e.output.decode())
-      raise
+  check_fixes(check_fixes_prefixes, has_check_fixes, input_file_name, temp_file_name)
+  check_messages(check_messages_prefixes, has_check_messages, clang_tidy_output, input_file_name, temp_file_name)
+  check_notes(check_notes_prefixes, has_check_notes, clang_tidy_output, input_file_name, temp_file_name)
 
 if __name__ == '__main__':
   main()
