@@ -189,15 +189,13 @@ int main(int Argc, const char **Argv) {
   // Create the compilation database.
   SmallString<256> PathBuf;
   sys::fs::current_path(PathBuf);
-  std::unique_ptr<CompilationDatabase> Compilations;
-  Compilations.reset(
-      new FixedCompilationDatabase(Twine(PathBuf), CC1Arguments));
+  FixedCompilationDatabase Compilations(Twine(PathBuf), CC1Arguments);
 
   // Store the callback trace information here.
   std::vector<CallbackCall> CallbackCalls;
 
   // Create the tool and run the compilation.
-  ClangTool Tool(*Compilations, SourcePaths);
+  ClangTool Tool(Compilations, SourcePaths);
   PPTraceFrontendActionFactory Factory(Ignore, CallbackCalls);
   int HadErrors = Tool.run(&Factory);
 
