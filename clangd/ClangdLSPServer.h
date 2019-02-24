@@ -1,9 +1,8 @@
 //===--- ClangdLSPServer.h - LSP server --------------------------*- C++-*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -38,7 +37,8 @@ public:
   /// for compile_commands.json in all parent directories of each file.
   /// If UseDirBasedCDB is false, compile commands are not read from disk.
   // FIXME: Clean up signature around CDBs.
-  ClangdLSPServer(Transport &Transp, const clangd::CodeCompleteOptions &CCOpts,
+  ClangdLSPServer(Transport &Transp, const FileSystemProvider &FSProvider,
+                  const clangd::CodeCompleteOptions &CCOpts,
                   llvm::Optional<Path> CompileCommandsDir, bool UseDirBasedCDB,
                   const ClangdServer::Options &Opts);
   ~ClangdLSPServer();
@@ -77,6 +77,8 @@ private:
   void onCompletion(const CompletionParams &, Callback<CompletionList>);
   void onSignatureHelp(const TextDocumentPositionParams &,
                        Callback<SignatureHelp>);
+  void onGoToDeclaration(const TextDocumentPositionParams &,
+                         Callback<std::vector<Location>>);
   void onGoToDefinition(const TextDocumentPositionParams &,
                         Callback<std::vector<Location>>);
   void onReference(const ReferenceParams &, Callback<std::vector<Location>>);
@@ -129,7 +131,7 @@ private:
   void call(StringRef Method, llvm::json::Value Params);
   void notify(StringRef Method, llvm::json::Value Params);
 
-  RealFileSystemProvider FSProvider;
+  const FileSystemProvider &FSProvider;
   /// Options used for code completion
   clangd::CodeCompleteOptions CCOpts;
   /// Options used for diagnostics.
