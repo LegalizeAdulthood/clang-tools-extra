@@ -140,6 +140,7 @@ void PPCallbacksTracker::InclusionDirective(
     llvm::StringRef SearchPath, llvm::StringRef RelativePath,
     const clang::Module *Imported, clang::SrcMgr::CharacteristicKind FileType) {
   beginCallback("InclusionDirective");
+  appendArgument("HashLoc", HashLoc);
   appendArgument("IncludeTok", IncludeTok);
   appendFilePathArgument("FileName", FileName);
   appendArgument("IsAngled", IsAngled);
