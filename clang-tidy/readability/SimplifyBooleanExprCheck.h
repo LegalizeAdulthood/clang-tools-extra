@@ -49,6 +49,12 @@ private:
   void matchCompoundIfReturnsBool(ast_matchers::MatchFinder *Finder, bool Value,
                                   StringRef Id);
 
+  void matchCaseIfReturnsBool(ast_matchers::MatchFinder *Finder, bool Value,
+                              StringRef Id);
+
+  void matchDefaultIfReturnsBool(ast_matchers::MatchFinder *Finder, bool Value,
+                                 StringRef Id);
+
   void
   replaceWithThenStatement(const ast_matchers::MatchFinder::MatchResult &Result,
                            const CXXBoolLiteralExpr *BoolLiteral);
@@ -59,20 +65,31 @@ private:
 
   void
   replaceWithCondition(const ast_matchers::MatchFinder::MatchResult &Result,
-                       const ConditionalOperator *Ternary,
-                       bool Negated = false);
+                       const ConditionalOperator *Ternary, bool Negated);
 
   void replaceWithReturnCondition(
       const ast_matchers::MatchFinder::MatchResult &Result, const IfStmt *If,
-      bool Negated = false);
+      bool Negated);
 
   void
   replaceWithAssignment(const ast_matchers::MatchFinder::MatchResult &Result,
-                        const IfStmt *If, bool Negated = false);
+                        const IfStmt *If, bool Negated);
 
   void replaceCompoundReturnWithCondition(
       const ast_matchers::MatchFinder::MatchResult &Result,
-      const CompoundStmt *Compound, bool Negated = false);
+      const CompoundStmt *Compound, bool Negated);
+
+  void replaceSwitchCaseCompoundReturnWithCondition(
+      const ast_matchers::MatchFinder::MatchResult &Result,
+      const CompoundStmt *Compound, bool Negated, const SwitchCase *SwitchCase);
+
+  void replaceCaseCompoundReturnWithCondition(
+      const ast_matchers::MatchFinder::MatchResult &Result,
+      const CompoundStmt *Compound, bool Negated);
+
+  void replaceDefaultCompoundReturnWithCondition(
+      const ast_matchers::MatchFinder::MatchResult &Result,
+      const CompoundStmt *Compound, bool Negated);
 
   void issueDiag(const ast_matchers::MatchFinder::MatchResult &Result,
                  SourceLocation Loc, StringRef Description,
